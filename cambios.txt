@@ -1,1 +1,2 @@
-?? cambios.txt
+ M cambios.txt
+ M index.html
