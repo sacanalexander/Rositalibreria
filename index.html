@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Librería Rosita - Sistema de Ventas</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
+    header { background-color: #2c3e50; color: white; text-align: center; padding: 20px; }
+    header h1 { margin: 0; font-size: 2.5em; }
+    .container { max-width: 1200px; margin: 20px auto; padding: 0 20px; }
+    .menu { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
+    .menu button { padding: 10px 20px; background-color: #db3466; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    .menu button:hover { background-color: #2980b9; }
+    .section { display: none; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .section.active { display: block; }
+    .excel-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    .excel-table th, .excel-table td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    .excel-table th { background-color: #af4c8e; color: white; }
+    .excel-table tr:nth-child(even) { background-color: #f2f2f2; }
+    .excel-table tr:hover { background-color: #ddd; }
+    form { display: flex; flex-direction: column; gap: 10px; max-width: 400px; margin: 0 auto; }
+    input, button { padding: 10px; border-radius: 5px; border: 1px solid #ccc; }
+    button { background-color: #3498db; color: white; border: none; cursor: pointer; }
+    button:hover { background-color: #2980b9; }
+    #invoice { white-space: pre-wrap; font-family: monospace; margin-top: 20px; }
+    footer { background-color: #2c3e50; color: white; text-align: center; padding: 10px; position: fixed; bottom: 0; width: 100%; }
+    #login { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #ecf0f1; }
+    #login-box { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); width: 300px; text-align: center; }
+    #login-box h2 { margin-bottom: 20px; }
+    #login-box input { width: 100%; margin: 8px 0; }
+    #login-box button { width: 100%; }
+    #login-error { color: red; margin-top: 10px; }
+    #app { display: none; }
+    .action-btn { padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; }
+    .edit-btn { background-color: #f39c12; color: white; }
+    .delete-btn { background-color: #e74c3c; color: white; }
+    @media print {
+      body * { visibility: hidden; }
+      #invoice, #invoice * { visibility: visible; }
+      #invoice { position: absolute; top: 0; left: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+  <div id="login-box">
+    <h2>Iniciar Sesión</h2>
+    <input type="text" id="username" placeholder="Usuario" required>
+    <input type="password" id="password" placeholder="Contraseña" required>
+    <button onclick="login()">Entrar</button>
+    <p id="login-error"></p>
+  </div>
+</div>
+
+<!-- APLICACIÓN -->
+<div id="app">
+  <header>
+    <h1>Librería Rosita</h1>
+    <p>¡Todo lo que necesitas para el colegio!</p>
+  </header>
+
+  <div class="container">
+    <div class="menu">
+      <button onclick="showSection('products')">Ver Productos</button>
+      <button onclick="showSection('add_stock')">Agregar/Modificar Stock</button>
+      <button onclick="showSection('search')">Buscar Producto</button>
+      <button onclick="showSection('sale')">Realizar Venta</button>
+      <button onclick="showSection('history')">Historial de Ventas</button>
+    </div>
+
+    <!-- Productos -->
+    <div id="products" class="section active">
+      <h2>Productos Disponibles</h2>
+      <table class="excel-table" id="product_list">
+        <thead>
+          <tr>
+            <th>Código de Barras</th>
+            <th>Nombre</th>
+            <th>Precio Compra</th>
+            <th>Precio Venta</th>
+            <th>Stock</th>
+            <th>Ganancia por Unidad</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- Agregar/Modificar Stock -->
+    <div id="add_stock" class="section">
+      <h2>Agregar/Actualizar Producto</h2>
+      <form id="stock_form">
+        <input type="text" id="barcode" placeholder="Código de barras" required>
+        <input type="text" id="name" placeholder="Nombre del producto" required>
+        <input type="number" id="buy_price" placeholder="Precio de compra (Q)" step="0.01" required>
+        <input type="number" id="sell_price" placeholder="Precio de venta (Q)" step="0.01" required>
+        <input type="number" id="quantity" placeholder="Cantidad" required>
+        <button type="submit">Guardar</button>
+      </form>
+      <p id="stock_message"></p>
+    </div>
+
+    <!-- Buscar -->
+    <div id="search" class="section">
+      <h2>Buscar Producto</h2>
+      <input type="text" id="search_barcode" placeholder="Código de barras">
+      <button onclick="searchProduct()">Buscar</button>
+      <p id="search_result"></p>
+    </div>
+
+    <!-- Venta -->
+    <div id="sale" class="section">
+      <h2>Realizar Venta</h2>
+      <form id="sale_form">
+        <input type="text" id="client_nit_cf" placeholder="NIT o C/F" required>
+        <input type="text" id="client_name" placeholder="Nombre del cliente" required>
+        <input type="text" id="sale_barcode" placeholder="Código de barras" oninput="autoShowProduct()">
+        <p id="product_description" style="font-weight:bold; color:green;"></p>
+        <input type="number" id="sale_quantity" placeholder="Cantidad" min="1">
+        <button type="button" onclick="addSaleItem()">Agregar Producto</button>
+        <div id="sale_items"></div>
+        <button type="submit">Finalizar Venta</button>
+      </form>
+      <p id="sale_message"></p>
+      <div id="invoice"></div>
+    </div>
+
+    <!-- Historial -->
+    <div id="history" class="section">
+      <h2>Historial de Ventas</h2>
+      <table class="excel-table" id="history_table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Cliente</th>
+            <th>NIT/C.F</th>
+            <th>Productos</th>
+            <th>Total</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>
+    <p>&copy; 2025 Librería Rosita. Todos los derechos reservados.</p>
+  </footer>
+</div>
+
+<script>
+  // --- LOGIN ---
+  const users = { admin: "1234", rosita: "5678" };
+  function login() {
+    const u = document.getElementById('username').value;
+    const p = document.getElementById('password').value;
+    if (users[u] && users[u] === p) {
+      document.getElementById('login').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      showSection('products');
+    } else {
+      document.getElementById('login-error').textContent = "Usuario o contraseña incorrectos.";
+    }
+  }
+
+  // --- INVENTARIO ---
+  let inventory = JSON.parse(localStorage.getItem('inventory')) || {};
+  let sales_history = JSON.parse(localStorage.getItem('sales_history')) || [];
+  let saleItems = [];
+  let editMode = false;
+  let editBarcode = "";
+
+  function saveData() {
+    localStorage.setItem('inventory', JSON.stringify(inventory));
+    localStorage.setItem('sales_history', JSON.stringify(sales_history));
+  }
+
+  function showSection(sectionId) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.getElementById(sectionId).classList.add('active');
+    if(sectionId==='products') loadProducts();
+    if(sectionId==='history') loadHistory();
+  }
+
+  function loadProducts() {
+    const tbody = document.querySelector('#product_list tbody');
+    tbody.innerHTML = '';
+    for(let barcode in inventory){
+      const prod = inventory[barcode];
+      const profit = prod.sell_price - prod.buy_price;
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${barcode}</td>
+        <td>${prod.name}</td>
+        <td>Q${prod.buy_price.toFixed(2)}</td>
+        <td>Q${prod.sell_price.toFixed(2)}</td>
+        <td>${prod.stock}</td>
+        <td>Q${profit.toFixed(2)}</td>
+        <td>
+          <button class="action-btn edit-btn" onclick="editProduct('${barcode}')">Modificar</button>
+          <button class="action-btn delete-btn" onclick="deleteProduct('${barcode}')">Eliminar</button>
+        </td>`;
+      tbody.appendChild(row);
+    }
+  }
+
+  document.getElementById('stock_form').addEventListener('submit', e=>{
+    e.preventDefault();
+    const barcode = document.getElementById('barcode').value;
+    const name = document.getElementById('name').value;
+    const buy_price = parseFloat(document.getElementById('buy_price').value);
+    const sell_price = parseFloat(document.getElementById('sell_price').value);
+    const quantity = parseInt(document.getElementById('quantity').value);
+
+    if(editMode){
+      inventory[editBarcode] = {name,buy_price,sell_price,stock:quantity};
+      editMode=false; editBarcode="";
+      document.getElementById('stock_message').textContent=`Producto ${name} modificado correctamente.`;
+    }else{
+      if(barcode in inventory){
+        inventory[barcode].stock += quantity;
+        document.getElementById('stock_message').textContent=`Stock actualizado para ${name}. Nuevo stock: ${inventory[barcode].stock}`;
+      }else{
+        inventory[barcode] = {name,buy_price,sell_price,stock:quantity};
+        document.getElementById('stock_message').textContent=`Producto ${name} agregado al inventario.`;
+      }
+    }
+    saveData();
+    document.getElementById('stock_form').reset();
+    loadProducts();
+  });
+
+  function editProduct(barcode){
+    const prod = inventory[barcode];
+    document.getElementById('barcode').value = barcode;
+    document.getElementById('name').value = prod.name;
+    document.getElementById('buy_price').value = prod.buy_price;
+    document.getElementById('sell_price').value = prod.sell_price;
+    document.getElementById('quantity').value = prod.stock;
+    editMode=true;
+    editBarcode=barcode;
+    showSection('add_stock');
+  }
+
+  function deleteProduct(barcode){
+    if(confirm("¿Seguro que quieres eliminar este producto?")){
+      delete inventory[barcode];
+      saveData();
+      loadProducts();
+    }
+  }
+
+  function searchProduct(){
+    const barcode = document.getElementById('search_barcode').value;
+    const result = document.getElementById('search_result');
+    if(barcode in inventory){
+      const p = inventory[barcode];
+      result.innerHTML=`Producto: ${p.name}<br>Stock: ${p.stock}<br>Precio Compra: Q${p.buy_price.toFixed(2)}<br>Precio Venta: Q${p.sell_price.toFixed(2)}<br>Ganancia: Q${(p.sell_price-p.buy_price).toFixed(2)}`;
+    }else result.textContent='Producto no encontrado.';
+  }
+
+  function autoShowProduct(){
+    const barcode = document.getElementById('sale_barcode').value;
+    const desc = document.getElementById('product_description');
+    desc.textContent = barcode in inventory ? inventory[barcode].name : '';
+  }
+
+  function addSaleItem(){
+    const barcode = document.getElementById('sale_barcode').value;
+    const quantity = parseInt(document.getElementById('sale_quantity').value);
+    if(barcode && quantity && barcode in inventory && inventory[barcode].stock>=quantity){
+      const existing = saleItems.find(i=>i.barcode===barcode);
+      if(existing) existing.quantity+=quantity;
+      else saleItems.push({barcode,quantity});
+      renderSaleItems();
+      document.getElementById('sale_barcode').value='';
+      document.getElementById('sale_quantity').value='';
+      document.getElementById('product_description').textContent='';
+    }else document.getElementById('sale_message').textContent='Producto no encontrado o sin stock suficiente.';
+  }
+
+  function renderSaleItems(){
+    const div = document.getElementById('sale_items');
+    div.innerHTML = saleItems.map(item=>`<p>${inventory[item.barcode].name} - Cantidad: ${item.quantity}</p>`).join('');
+  }
+
+  document.getElementById('sale_form').addEventListener('submit', e=>{
+    e.preventDefault();
+    const client_nit_cf = document.getElementById('client_nit_cf').value;
+    const client_name = document.getElementById('client_name').value;
+    if(!saleItems.length){ document.getElementById('sale_message').textContent='No se agregaron productos.'; return; }
+
+    let total=0;
+    const sale_products=[];
+    for(let item of saleItems){
+      const prod = inventory[item.barcode];
+      total += item.quantity * prod.sell_price;
+      sale_products.push({barcode:item.barcode,name:prod.name,quantity:item.quantity,price:prod.sell_price});
+      inventory[item.barcode].stock -= item.quantity;
+    }
+
+    const sale = {date: new Date(), client_nit_cf, client_name, products: sale_products, total};
+    sales_history.push(sale);
+    saveData();
+    document.getElementById('sale_message').textContent='Venta realizada con éxito.';
+    document.getElementById('invoice').innerHTML=`FACTURA<br>Cliente: ${client_name}<br>NIT/C.F: ${client_nit_cf}<br>Total: Q${total.toFixed(2)}`;
+    saleItems=[]; document.getElementById('sale_items').innerHTML=''; document.getElementById('sale_form').reset();
+    loadProducts();
+  });
+
+  function loadHistory(){
+    const tbody = document.querySelector('#history_table tbody');
+    tbody.innerHTML='';
+    const monthColors=['#ffe0e0','#e0ffe0','#e0e0ff','#fff0e0','#f0e0ff','#e0fff0','#fff0f0'];
+    let dayTotals={}, monthTotals={};
+
+    sales_history.forEach((sale,index)=>{
+      const date = new Date(sale.date);
+      const day = date.toLocaleDateString('es-GT');
+      const month = date.getMonth();
+      if(!dayTotals[day]) dayTotals[day]=0; dayTotals[day]+=sale.total;
+      if(!monthTotals[month]) monthTotals[month]=0; monthTotals[month]+=sale.total;
+
+      const row = document.createElement('tr');
+      row.style.backgroundColor = monthColors[month % monthColors.length];
+      row.innerHTML=`
+        <td>${date.toLocaleString('es-GT')}</td>
+        <td>${sale.client_name}</td>
+        <td>${sale.client_nit_cf}</td>
+        <td>${sale.products.map(p=>p.name+' x'+p.quantity).join('<br>')}</td>
+        <td>Q${sale.total.toFixed(2)}</td>
+        <td><button class="action-btn delete-btn" onclick="deleteSale(${index})">Eliminar</button></td>`;
+      tbody.appendChild(row);
+    });
+
+    const totalRowDay=document.createElement('tr');
+    totalRowDay.innerHTML=`<td colspan="4"><strong>Total por día:</strong></td><td colspan="2">${Object.entries(dayTotals).map(d=>`${d[0]}: Q${d[1].toFixed(2)}`).join('<br>')}</td>`;
+    tbody.appendChild(totalRowDay);
+
+    const totalRowMonth=document.createElement('tr');
+    totalRowMonth.innerHTML=`<td colspan="4"><strong>Total por mes:</strong></td><td colspan="2">${Object.entries(monthTotals).map(d=>`Mes ${parseInt(d[0])+1}: Q${d[1].toFixed(2)}`).join('<br>')}</td>`;
+    tbody.appendChild(totalRowMonth);
+  }
+
+  function deleteSale(index){
+    if(confirm("¿Desea eliminar esta venta?")){
+      sales_history.splice(index,1);
+      saveData();
+      loadHistory();
+    }
+  }
+</script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Librería Rosita - Sistema de Ventas</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
+    header { background-color: #2c3e50; color: white; text-align: center; padding: 20px; }
+    header h1 { margin: 0; font-size: 2.5em; }
+    .container { max-width: 1200px; margin: 20px auto; padding: 0 20px; }
+    .menu { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
+    .menu button { padding: 10px 20px; background-color: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    .menu button:hover { background-color: #2980b9; }
+    .section { display: none; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .section.active { display: block; }
+    .excel-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    .excel-table th, .excel-table td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    .excel-table th { background-color: #1b04ec; color: white; }
+    .excel-table tr:nth-child(even) { background-color: #f2f2f2; }
+    .excel-table tr:hover { background-color: #ddd; }
+    form { display: flex; flex-direction: column; gap: 10px; max-width: 400px; margin: 0 auto; }
+    input, button { padding: 10px; border-radius: 5px; border: 1px solid #ccc; }
+    button { background-color: #3498db; color: white; border: none; cursor: pointer; }
+    button:hover { background-color: #2980b9; }
+    #invoice { white-space: pre-wrap; font-family: monospace; margin-top: 20px; }
+    footer { background-color: #2c3e50; color: white; text-align: center; padding: 10px; position: fixed; bottom: 0; width: 100%; }
+    #login { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #ecf0f1; }
+    #login-box { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); width: 300px; text-align: center; }
+    #login-box h2 { margin-bottom: 20px; }
+    #login-box input { width: 100%; margin: 8px 0; }
+    #login-box button { width: 100%; }
+    #login-error { color: red; margin-top: 10px; }
+    #app { display: none; }
+    .action-btn { padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; }
+    .edit-btn { background-color: #f39c12; color: white; }
+    .delete-btn { background-color: #e74c3c; color: white; }
+    @media print {
+      body * { visibility: hidden; }
+      #invoice, #invoice * { visibility: visible; }
+      #invoice { position: absolute; top: 0; left: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+  <div id="login-box">
+    <h2>Iniciar Sesión</h2>
+    <input type="text" id="username" placeholder="Usuario" required>
+    <input type="password" id="password" placeholder="Contraseña" required>
+    <button onclick="login()">Entrar</button>
+    <p id="login-error"></p>
+  </div>
+</div>
+
+<!-- APLICACIÓN -->
+<div id="app">
+  <header>
+    <h1>Librería Rosita</h1>
+    <p>¡Todo lo que necesitas para el colegio!</p>
+  </header>
+
+  <div class="container">
+    <div class="menu">
+      <button onclick="showSection('products')">Ver Productos</button>
+      <button onclick="showSection('add_stock')">Agregar/Modificar Stock</button>
+      <button onclick="showSection('search')">Buscar Producto</button>
+      <button onclick="showSection('sale')">Realizar Venta</button>
+      <button onclick="showSection('history')">Historial de Ventas</button>
+    </div>
+
+    <!-- Productos -->
+    <div id="products" class="section active">
+      <h2>Productos Disponibles</h2>
+      <table class="excel-table" id="product_list">
+        <thead>
+          <tr>
+            <th>Código de Barras</th>
+            <th>Nombre</th>
+            <th>Precio Compra</th>
+            <th>Precio Venta</th>
+            <th>Stock</th>
+            <th>Ganancia por Unidad</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- Agregar/Modificar Stock -->
+    <div id="add_stock" class="section">
+      <h2>Agregar/Actualizar Producto</h2>
+      <form id="stock_form">
+        <input type="text" id="barcode" placeholder="Código de barras" required>
+        <input type="text" id="name" placeholder="Nombre del producto" required>
+        <input type="number" id="buy_price" placeholder="Precio de compra (Q)" step="0.01" required>
+        <input type="number" id="sell_price" placeholder="Precio de venta (Q)" step="0.01" required>
+        <input type="number" id="quantity" placeholder="Cantidad" required>
+        <button type="submit">Guardar</button>
+      </form>
+      <p id="stock_message"></p>
+    </div>
+
+    <!-- Buscar -->
+    <div id="search" class="section">
+      <h2>Buscar Producto</h2>
+      <input type="text" id="search_barcode" placeholder="Código de barras">
+      <button onclick="searchProduct()">Buscar</button>
+      <p id="search_result"></p>
+    </div>
+
+    <!-- Venta -->
+    <div id="sale" class="section">
+      <h2>Realizar Venta</h2>
+      <form id="sale_form">
+        <input type="text" id="client_nit_cf" placeholder="NIT o C/F" required>
+        <input type="text" id="client_name" placeholder="Nombre del cliente" required>
+        <input type="text" id="sale_barcode" placeholder="Código de barras" oninput="autoShowProduct()">
+        <p id="product_description" style="font-weight:bold; color:green;"></p>
+        <input type="number" id="sale_quantity" placeholder="Cantidad" min="1">
+        <button type="button" onclick="addSaleItem()">Agregar Producto</button>
+        <div id="sale_items"></div>
+        <button type="submit">Finalizar Venta</button>
+      </form>
+      <p id="sale_message"></p>
+      <div id="invoice"></div>
+    </div>
+
+    <!-- Historial -->
+    <div id="history" class="section">
+      <h2>Historial de Ventas</h2>
+      <table class="excel-table" id="history_table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Cliente</th>
+            <th>NIT/C.F</th>
+            <th>Productos</th>
+            <th>Total</th>
+            <th>Ganancia</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>
+    <p>&copy; 2025 Librería Rosita. Todos los derechos reservados.</p>
+  </footer>
+</div>
+<!-- Venta -->
+<div id="sale" class="section">
+  <h2>Realizar Venta</h2>
+  <form id="sale_form">
+    <input type="text" id="client_nit_cf" placeholder="NIT o C/F" required>
+    <input type="text" id="client_name" placeholder="Nombre del cliente" required>
+    <input type="text" id="sale_barcode" placeholder="Código de barras" oninput="autoShowProduct()">
+    <p id="product_description" style="font-weight:bold; color:green;"></p>
+    <input type="number" id="sale_quantity" placeholder="Cantidad" min="1">
+    <button type="button" onclick="addSaleItem()">Agregar Producto</button>
+    <div id="sale_items"></div>
+    <button type="submit">Finalizar Venta</button>
+  </form>
+  <p id="sale_message"></p>
+  <div id="invoice"></div>
+</div>
+
+<script>
+function addSaleItem(){
+  const barcode = document.getElementById('sale_barcode').value;
+  const quantity = parseInt(document.getElementById('sale_quantity').value);
+  if(barcode && quantity && barcode in inventory && inventory[barcode].stock>=quantity){
+    const existing = saleItems.find(i=>i.barcode===barcode);
+    if(existing) existing.quantity+=quantity;
+    else saleItems.push({barcode,quantity});
+    renderSaleItems();
+    document.getElementById('sale_barcode').value='';
+    document.getElementById('sale_quantity').value='';
+    document.getElementById('product_description').textContent='';
+    document.getElementById('sale_message').textContent='';
+  }else document.getElementById('sale_message').textContent='Producto no encontrado o sin stock suficiente.';
+}
+
+function renderSaleItems(){
+  const div = document.getElementById('sale_items');
+  div.innerHTML = saleItems.map(item=>{
+    const prod = inventory[item.barcode];
+    return `<p>${prod.name} - Cantidad: ${item.quantity} - Precio: Q${prod.sell_price.toFixed(2)}</p>`;
+  }).join('');
+}
+
+document.getElementById('sale_form').addEventListener('submit', e=>{
+  e.preventDefault();
+  const client_nit_cf = document.getElementById('client_nit_cf').value;
+  const client_name = document.getElementById('client_name').value;
+  if(!saleItems.length){ document.getElementById('sale_message').textContent='No se agregaron productos.'; return; }
+
+  let total=0;
+  let profitTotal=0;
+  const sale_products=[];
+
+  let invoiceHTML = `<strong>FACTURA</strong><br>Cliente: ${client_name}<br>NIT/C.F: ${client_nit_cf}<br><br>`;
+  invoiceHTML += `<table border="1" cellpadding="5" cellspacing="0"><tr><th>Producto</th><th>Cantidad</th><th>Precio Unitario</th><th>Subtotal</th><th>Ganancia</th></tr>`;
+
+  for(let item of saleItems){
+    const prod = inventory[item.barcode];
+    const subtotal = prod.sell_price * item.quantity;
+    const profit = (prod.sell_price - prod.buy_price) * item.quantity;
+    total += subtotal;
+    profitTotal += profit;
+    sale_products.push({barcode:item.barcode,name:prod.name,quantity:item.quantity,price:prod.sell_price});
+    invoiceHTML += `<tr>
+      <td>${prod.name}</td>
+      <td>${item.quantity}</td>
+      <td>Q${prod.sell_price.toFixed(2)}</td>
+      <td>Q${subtotal.toFixed(2)}</td>
+      <td>Q${profit.toFixed(2)}</td>
+    </tr>`;
+    inventory[item.barcode].stock -= item.quantity;
+  }
+
+  invoiceHTML += `<tr>
+    <td colspan="3"><strong>Total</strong></td>
+    <td><strong>Q${total.toFixed(2)}</strong></td>
+    <td><strong>Q${profitTotal.toFixed(2)}</strong></td>
+  </tr></table>`;
+
+  const sale = {date: new Date(), client_nit_cf, client_name, products: sale_products, total, profit: profitTotal};
+  sales_history.push(sale);
+  saveData();
+
+  document.getElementById('sale_message').textContent='Venta realizada con éxito.';
+  document.getElementById('invoice').innerHTML=invoiceHTML;
+
+  saleItems=[]; document.getElementById('sale_items').innerHTML=''; 
+  document.getElementById('sale_form').reset();
+  loadProducts();
+});
+</script>
+
+<script>
+  // --- LOGIN ---
+  const users = { admin: "1234", rosita: "5678" };
+  function login() {
+    const u = document.getElementById('username').value;
+    const p = document.getElementById('password').value;
+    if (users[u] && users[u] === p) {
+      document.getElementById('login').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      showSection('products');
+    } else {
+      document.getElementById('login-error').textContent = "Usuario o contraseña incorrectos.";
+    }
+  }
+
+  // --- INVENTARIO ---
+  let inventory = JSON.parse(localStorage.getItem('inventory')) || {};
+  let sales_history = JSON.parse(localStorage.getItem('sales_history')) || [];
+  let saleItems = [];
+  let editMode = false;
+  let editBarcode = "";
+
+  function saveData() {
+    localStorage.setItem('inventory', JSON.stringify(inventory));
+    localStorage.setItem('sales_history', JSON.stringify(sales_history));
+  }
+
+  function showSection(sectionId) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.getElementById(sectionId).classList.add('active');
+    if(sectionId==='products') loadProducts();
+    if(sectionId==='history') loadHistory();
+  }
+
+  function loadProducts() {
+    const tbody = document.querySelector('#product_list tbody');
+    tbody.innerHTML = '';
+    for(let barcode in inventory){
+      const prod = inventory[barcode];
+      const profit = prod.sell_price - prod.buy_price;
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${barcode}</td>
+        <td>${prod.name}</td>
+        <td>Q${prod.buy_price.toFixed(2)}</td>
+        <td>Q${prod.sell_price.toFixed(2)}</td>
+        <td>${prod.stock}</td>
+        <td>Q${profit.toFixed(2)}</td>
+        <td>
+          <button class="action-btn edit-btn" onclick="editProduct('${barcode}')">Modificar</button>
+          <button class="action-btn delete-btn" onclick="deleteProduct('${barcode}')">Eliminar</button>
+        </td>`;
+      tbody.appendChild(row);
+    }
+  }
+
+  document.getElementById('stock_form').addEventListener('submit', e=>{
+    e.preventDefault();
+    const barcode = document.getElementById('barcode').value;
+    const name = document.getElementById('name').value;
+    const buy_price = parseFloat(document.getElementById('buy_price').value);
+    const sell_price = parseFloat(document.getElementById('sell_price').value);
+    const quantity = parseInt(document.getElementById('quantity').value);
+
+    if(editMode){
+      inventory[editBarcode] = {name,buy_price,sell_price,stock:quantity};
+      editMode=false; editBarcode="";
+      document.getElementById('stock_message').textContent=`Producto ${name} modificado correctamente.`;
+    }else{
+      if(barcode in inventory){
+        inventory[barcode].stock += quantity;
+        document.getElementById('stock_message').textContent=`Stock actualizado para ${name}. Nuevo stock: ${inventory[barcode].stock}`;
+      }else{
+        inventory[barcode] = {name,buy_price,sell_price,stock:quantity};
+        document.getElementById('stock_message').textContent=`Producto ${name} agregado al inventario.`;
+      }
+    }
+    saveData();
+    document.getElementById('stock_form').reset();
+    loadProducts();
+  });
+
+  function editProduct(barcode){
+    const prod = inventory[barcode];
+    document.getElementById('barcode').value = barcode;
+    document.getElementById('name').value = prod.name;
+    document.getElementById('buy_price').value = prod.buy_price;
+    document.getElementById('sell_price').value = prod.sell_price;
+    document.getElementById('quantity').value = prod.stock;
+    editMode=true;
+    editBarcode=barcode;
+    showSection('add_stock');
+  }
+
+  function deleteProduct(barcode){
+    if(confirm("¿Seguro que quieres eliminar este producto?")){
+      delete inventory[barcode];
+      saveData();
+      loadProducts();
+    }
+  }
+
+  function searchProduct(){
+    const barcode = document.getElementById('search_barcode').value;
+    const result = document.getElementById('search_result');
+    if(barcode in inventory){
+      const p = inventory[barcode];
+      result.innerHTML=`Producto: ${p.name}<br>Stock: ${p.stock}<br>Precio Compra: Q${p.buy_price.toFixed(2)}<br>Precio Venta: Q${p.sell_price.toFixed(2)}<br>Ganancia: Q${(p.sell_price-p.buy_price).toFixed(2)}`;
+    }else result.textContent='Producto no encontrado.';
+  }
+
+  function autoShowProduct(){
+    const barcode = document.getElementById('sale_barcode').value;
+    const desc = document.getElementById('product_description');
+    desc.textContent = barcode in inventory ? inventory[barcode].name : '';
+  }
+
+  function addSaleItem(){
+    const barcode = document.getElementById('sale_barcode').value;
+    const quantity = parseInt(document.getElementById('sale_quantity').value);
+    if(barcode && quantity && barcode in inventory && inventory[barcode].stock>=quantity){
+      const existing = saleItems.find(i=>i.barcode===barcode);
+      if(existing) existing.quantity+=quantity;
+      else saleItems.push({barcode,quantity});
+      renderSaleItems();
+      document.getElementById('sale_barcode').value='';
+      document.getElementById('sale_quantity').value='';
+      document.getElementById('product_description').textContent='';
+    }else document.getElementById('sale_message').textContent='Producto no encontrado o sin stock suficiente.';
+  }
+
+  function renderSaleItems(){
+    const div = document.getElementById('sale_items');
+    div.innerHTML = saleItems.map(item=>`<p>${inventory[item.barcode].name} - Cantidad: ${item.quantity}</p>`).join('');
+  }
+
+  document.getElementById('sale_form').addEventListener('submit', e=>{
+    e.preventDefault();
+    const client_nit_cf = document.getElementById('client_nit_cf').value;
+    const client_name = document.getElementById('client_name').value;
+    if(!saleItems.length){ document.getElementById('sale_message').textContent='No se agregaron productos.'; return; }
+
+    let total=0, totalProfit=0;
+    const sale_products=[];
+    for(let item of saleItems){
+      const prod = inventory[item.barcode];
+      total += item.quantity * prod.sell_price;
+      totalProfit += item.quantity * (prod.sell_price - prod.buy_price);
+      sale_products.push({barcode:item.barcode,name:prod.name,quantity:item.quantity,price:prod.sell_price});
+      inventory[item.barcode].stock -= item.quantity;
+    }
+
+    const sale = {date: new Date(), client_nit_cf, client_name, products: sale_products, total, profit: totalProfit};
+    sales_history.push(sale);
+    saveData();
+    document.getElementById('sale_message').textContent='Venta realizada con éxito.';
+    document.getElementById('invoice').innerHTML=`FACTURA<br>Cliente: ${client_name}<br>NIT/C.F: ${client_nit_cf}<br>Total: Q${total.toFixed(2)}<br>Ganancia: Q${totalProfit.toFixed(2)}`;
+    saleItems=[]; document.getElementById('sale_items').innerHTML=''; document.getElementById('sale_form').reset();
+    loadProducts();
+  });
+
+  function loadHistory(){
+    const tbody = document.querySelector('#history_table tbody');
+    tbody.innerHTML='';
+    const monthColors=['#ffe0e0','#e0ffe0','#e0e0ff','#fff0e0','#f0e0ff','#e0fff0','#fff0f0'];
+    let dayTotals={}, dayProfits={}, monthTotals={}, monthProfits={};
+
+    sales_history.forEach((sale,index)=>{
+      const date = new Date(sale.date);
+      const day = date.toLocaleDateString('es-GT');
+      const month = date.getMonth();
+
+      if(!dayTotals[day]) { dayTotals[day]=0; dayProfits[day]=0; }
+      dayTotals[day]+=sale.total;
+      dayProfits[day]+=sale.profit;
+
+      if(!monthTotals[month]) { monthTotals[month]=0; monthProfits[month]=0; }
+      monthTotals[month]+=sale.total;
+      monthProfits[month]+=sale.profit;
+
+      const row = document.createElement('tr');
+      row.style.backgroundColor = monthColors[month % monthColors.length];
+      row.innerHTML=`
+        <td>${date.toLocaleString('es-GT')}</td>
+        <td>${sale.client_name}</td>
+        <td>${sale.client_nit_cf}</td>
+        <td>${sale.products.map(p=>p.name+' x'+p.quantity).join('<br>')}</td>
+        <td>Q${sale.total.toFixed(2)}</td>
+        <td>Q${sale.profit.toFixed(2)}</td>
+        <td><button class="action-btn delete-btn" onclick="deleteSale(${index})">Eliminar</button></td>`;
+      tbody.appendChild(row);
+    });
+
+    // Totales por día
+    const totalRowDay=document.createElement('tr');
+    totalRowDay.innerHTML=`<td colspan="4"><strong>Total por día:</strong></td><td>${Object.entries(dayTotals).map(d=>`${d[0]}: Q${d[1].toFixed(2)}`).join('<br>')}</td><td>${Object.entries(dayProfits).map(d=>`Q${d[1].toFixed(2)}`).join('<br>')}</td><td></td>`;
+    tbody.appendChild(totalRowDay);
+
+    // Totales por mes
+    const totalRowMonth=document.createElement('tr');
+    totalRowMonth.innerHTML=`<td colspan="4"><strong>Total por mes:</strong></td><td>${Object.entries(monthTotals).map(d=>`Mes ${parseInt(d[0])+1}: Q${d[1].toFixed(2)}`).join('<br>')}</td><td>${Object.entries(monthProfits).map(d=>`Q${d[1].toFixed(2)}`).join('<br>')}</td><td></td>`;
+    tbody.appendChild(totalRowMonth);
+  }
+
+  function deleteSale(index){
+    if(confirm("¿Desea eliminar esta venta?")){
+      sales_history.splice(index,1);
+      saveData();
+      loadHistory();
+    }
+  }
+</script>
+</body>
+</html>
